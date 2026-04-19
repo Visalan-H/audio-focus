@@ -1,84 +1,138 @@
 console.log("Background script started");
 
 let enabled = true;
+let focusedTabId = null;
+let activeTabId = null;
+const playingTabs = new Set();
+const mutedByUs = new Set();
 
 chrome.storage.local.get(["enabled"], (res) => {
-    if (res.enabled !== undefined) {
-        enabled = res.enabled;
-    }
-    console.log("Enabled state:", enabled);
+    if (chrome.runtime.lastError || !res) return;
+    if (res.enabled !== undefined) enabled = res.enabled;
 });
 
-async function handleAudioFocus() {
-    console.log("Running audio focus");
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) activeTabId = tabs[0].id;
+});
 
+function muteTab(tabId) {
+    chrome.tabs.update(tabId, { muted: true }, () => void chrome.runtime.lastError);
+    mutedByUs.add(tabId);
+}
+
+function unmuteTab(tabId) {
+    chrome.tabs.update(tabId, { muted: false }, () => void chrome.runtime.lastError);
+    mutedByUs.delete(tabId);
+}
+
+function unmutAll() {
+    for (const tabId of mutedByUs) {
+        chrome.tabs.update(tabId, { muted: false }, () => void chrome.runtime.lastError);
+    }
+    mutedByUs.clear();
+    focusedTabId = null;
+}
+
+function pickNewFocus() {
+    if (playingTabs.has(focusedTabId)) return;
+    focusedTabId = playingTabs.size > 0 ? [...playingTabs][0] : null;
+}
+
+async function handleAudioFocus() {
     if (!enabled) {
-        console.log("Disabled");
+        unmutAll();
         return;
     }
 
     try {
         const tabs = await chrome.tabs.query({});
-        console.log("Total tabs:", tabs.length);
+        const openIds = new Set(tabs.map(t => t.id));
 
-        const audibleTabs = tabs.filter(tab => tab.audible);
-        console.log("Audible tabs:", audibleTabs.map(t => t.id));
+        for (const id of playingTabs) if (!openIds.has(id)) playingTabs.delete(id);
+        for (const id of mutedByUs) if (!openIds.has(id)) mutedByUs.delete(id);
 
-        if (audibleTabs.length === 0) {
-            console.log("No audio → unmuting all");
+        pickNewFocus();
 
-            for (const tab of tabs) {
-                if (tab.id !== undefined && tab.mutedInfo?.muted) {
-                    chrome.tabs.update(tab.id, { muted: false });
-                }
-            }
+        if (!focusedTabId) {
+            unmutAll();
             return;
         }
 
-        const activeTab =
-            audibleTabs.find(tab => tab.active) || audibleTabs[0];
-
-        console.log("Active audio tab:", activeTab.id);
-
         for (const tab of tabs) {
             if (tab.id === undefined) continue;
-
-            if (tab.id === activeTab.id) {
-                if (tab.mutedInfo?.muted) {
-                    chrome.tabs.update(tab.id, { muted: false });
+            if (tab.id === focusedTabId) {
+                if (tab.mutedInfo?.muted && mutedByUs.has(tab.id)) {
+                    unmuteTab(tab.id);
                 }
             } else {
                 if (!tab.mutedInfo?.muted) {
-                    chrome.tabs.update(tab.id, { muted: true });
+                    muteTab(tab.id);
                 }
             }
         }
-
     } catch (err) {
         console.error("Error:", err);
     }
 }
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    console.log("onUpdated:", tabId, changeInfo);
-    if (changeInfo.audible !== undefined) {
+chrome.runtime.onMessage.addListener((msg, sender) => {
+    if (!sender.tab?.id) return;
+    const tabId = sender.tab.id;
+
+    if (msg.type === "MEDIA_PLAYING") {
+        if (playingTabs.has(tabId)) return;
+        playingTabs.add(tabId);
+        if (!focusedTabId || tabId === activeTabId) {
+            focusedTabId = tabId;
+        }
         handleAudioFocus();
+    } else if (msg.type === "MEDIA_STOPPED") {
+        if (!playingTabs.has(tabId)) return;
+        playingTabs.delete(tabId);
+        if (focusedTabId === tabId) focusedTabId = null;
+
+        if (playingTabs.size === 0) {
+            unmutAll();
+        } else {
+            pickNewFocus();
+            handleAudioFocus();
+        }
+    }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.audible === true) {
+        playingTabs.add(tabId);
+        if (!focusedTabId || tabId === activeTabId) focusedTabId = tabId;
+        handleAudioFocus();
+    }
+    if (changeInfo.audible === false) {
+        playingTabs.delete(tabId);
+        if (focusedTabId === tabId) focusedTabId = null;
+        if (playingTabs.size === 0) {
+            unmutAll();
+        } else {
+            pickNewFocus();
+            handleAudioFocus();
+        }
     }
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
-    console.log("onActivated:", activeInfo.tabId);
-    handleAudioFocus();
+    activeTabId = activeInfo.tabId;
+    if (playingTabs.has(activeInfo.tabId)) {
+        focusedTabId = activeInfo.tabId;
+        handleAudioFocus();
+    }
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-    console.log("onRemoved:", tabId);
-    handleAudioFocus();
+    playingTabs.delete(tabId);
+    mutedByUs.delete(tabId);
+    if (focusedTabId === tabId) focusedTabId = null;
+    if (playingTabs.size === 0) unmutAll();
+    else handleAudioFocus();
 });
 
-setInterval(() => {
-    console.log("Polling...");
-    handleAudioFocus();
-}, 300);
-
+setInterval(() => handleAudioFocus(), 2000);
 handleAudioFocus();
