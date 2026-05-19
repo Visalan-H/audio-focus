@@ -2,19 +2,89 @@
 <html>
 
 <head>
+    <meta charset="utf-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <div class="container">
-        <h3>Audio Focus</h3>
-        <label class="switch">
-            <input type="checkbox" id="toggle">
-            <span class="slider"></span>
-        </label>
-        <p id="status"></p>
-    </div>
+    <div class="popup">
 
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.5" />
+                    <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+                <span class="logo-text">Audio Focus</span>
+            </div>
+
+            <!-- Master toggle -->
+            <label class="power-toggle" title="Enable / Disable">
+                <input type="checkbox" id="masterToggle">
+                <span class="power-knob">
+                    <svg viewBox="0 0 16 16" fill="none">
+                        <path d="M8 2v5M5 3.8A5 5 0 1 0 11 3.8" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" />
+                    </svg>
+                </span>
+            </label>
+        </header>
+
+        <!-- Mode picker -->
+        <section class="section" id="mainContent">
+            <p class="section-label">Mode</p>
+            <div class="mode-pills">
+                <button class="pill" id="modeMute" data-mode="mute">
+                    <svg viewBox="0 0 16 16" fill="none" class="pill-icon">
+                        <path d="M10 6l4 4M14 6l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                        <path d="M2 5.5h1.5L7 3v10L3.5 10.5H2a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 2 5.5z"
+                            stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                    </svg>
+                    Mute
+                </button>
+                <button class="pill" id="modeDuck" data-mode="duck">
+                    <svg viewBox="0 0 16 16" fill="none" class="pill-icon">
+                        <path d="M10 5.5a3 3 0 0 1 0 5" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" />
+                        <path d="M2 5.5h1.5L7 3v10L3.5 10.5H2a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 2 5.5z"
+                            stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                    </svg>
+                    Duck
+                </button>
+            </div>
+
+            <!-- Duck volume — only shown in duck mode -->
+            <div class="duck-panel" id="duckPanel">
+                <div class="duck-header">
+                    <p class="section-label">Background Volume</p>
+                    <span class="duck-value" id="duckValueLabel">20%</span>
+                </div>
+                <div class="slider-track-wrap">
+                    <input type="range" id="duckSlider" min="1" max="99" value="20" class="duck-slider">
+                    <div class="slider-fill" id="sliderFill"></div>
+                </div>
+                <div class="slider-ticks">
+                    <span>1%</span>
+                    <span>50%</span>
+                    <span>99%</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Status bar -->
+        <footer class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-text" id="statusText">Loading…</span>
+        </footer>
+
+    </div>
     <script src="popup.js"></script>
 </body>
 

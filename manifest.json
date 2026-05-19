@@ -1,16 +1,14 @@
 {
     "manifest_version": 3,
     "name": "Audio Focus",
-    "version": "1.0",
+    "version": "2.0",
+    "description": "Keep one tab's audio in focus — mute or duck all others.",
     "permissions": [
         "tabs",
         "storage"
     ],
     "background": {
         "service_worker": "background.js"
-    },
-    "action": {
-        "default_popup": "popup.html"
     },
     "content_scripts": [
         {
@@ -22,5 +20,9 @@
             ],
             "run_at": "document_idle"
         }
-    ]
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Audio Focus"
+    }
 }
